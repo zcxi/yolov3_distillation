@@ -28,6 +28,7 @@ def train(
     # Pass in train data configuration
     train_path = parse_data_cfg(data_cfg)['train']
 
+    checkpointPath = 'checkpoints/'
     # Initialize model
     model = Darknet(cfg, img_size)
 
@@ -46,8 +47,11 @@ def train(
     # Transfer learning (train only YOLO layers)
 
     # Freeze all but YOLO layer
-    # for i, (name, p) in enumerate(model.named_parameters()):
-    #     p.requires_grad = True if (p.shape[0] == 255) else False
+    for i, (name, p) in enumerate(model.named_parameters()):
+        if(i<cutoff):
+            p.requires_grad = True
+        else:
+            p.requires_grad = False
 
     # Freeze first X layers
     # for i, (name, p) in enumerate(model.named_parameters()):
@@ -60,6 +64,8 @@ def train(
     for epoch in range(epochs):
         model.train()
         epoch += 1
+
+
 
         for i, (imgs, targets, _, _) in enumerate(dataloader):
 
@@ -74,14 +80,30 @@ def train(
             targetsAltered = getTargets(model, targets, pred)
             loss = lossCustom(pred, targetsAltered) # loss = lxy + lwh + lconf + lcls
 
-            print(loss)
             # Compute gradient
             loss.backward()
 
             # Accumulate gradient for x batches before optimizing
-            if ((i + 1) % accumulated_batches == 0) or (i == len(dataloader) - 1):
-                optimizer.step()
-                optimizer.zero_grad()
+            # if ((i + 1) % accumulated_batches == 0) or (i == len(dataloader) - 1):
+            optimizer.step()
+            optimizer.zero_grad()
+
+        # checkpoint stuff
+
+        print("Epoch: {} Loss: {}".format(epoch, loss))
+        # print(loss)
+        # checkpoint = {'epoch': epoch,
+        #               'model':  model.state_dict(),
+        #               'optimizer': optimizer.state_dict()}
+        # torch.save(checkpoint, checkpointPath + 'latest.pt')
+        #
+        # # save checkpoint (source...director)
+        # if (epoch > 0) & (epoch % 5 == 0):
+        #     os.system('cp ' + checkpointPath +  'latest.pt' + ' ' + 'weights/backup{}.pt'.format(epoch))
+        #
+        # # write the loss to results.txt (epoch __ loss)
+        # with open('results.txt', 'a') as file:
+        #     file.write("{} {} " + '\n'.format(epoch, loss))
 
 # Main function
 if __name__ == '__main__':
